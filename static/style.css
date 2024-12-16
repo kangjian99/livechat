@@ -119,12 +119,12 @@ button:hover {
         max-width: none;
         margin: 0;
         flex: 1;
-        max-height: 30vh;
+        max-height: 25vh;
         overflow-y: auto;
     }
     
     .messages {
-        font-size: 16px;
+        font-size: 14px;
         padding: 5px;
         margin-bottom: 5px;
         max-height: 250px;
@@ -132,9 +132,9 @@ button:hover {
     }
     
     .message {
-        padding: 10px;
+        padding: 5px;
         margin: 5px 0;
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .input-container {
