@@ -19,6 +19,8 @@ const OPTIMAL_BUFFER_SIZE = 24576;  // 保持理想大小不变
 
 const FRAME_CAPTURE_INTERVAL = 2000; // 捕获1帧间隔时间
 
+let currentFacingMode = "environment"; // 默认使用后置摄像头
+
 async function processAudioBuffers() {
     if (isProcessingAudio || audioBuffers.length === 0) {
         return;
@@ -205,9 +207,12 @@ function connectWebSocket() {
 // 获取用户媒体流
 async function startMedia() {
     try {
-        // 更严格的音频约束
         mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
@@ -215,8 +220,8 @@ async function startMedia() {
                 channelCount: 1,
                 sampleRate: 16000,
                 latency: 0,
-                echoCancellationType: 'system',  // 使用系统级回音消除
-                suppressLocalAudioPlayback: true  // 禁止本地音频回放
+                echoCancellationType: 'system',
+                suppressLocalAudioPlayback: true
             }
         });
         
@@ -413,3 +418,33 @@ document.getElementById('stopButton').onclick = () => {
 document.getElementById('messageInput').onkeydown = (e) => {
     if (e.key === 'Enter') sendMessage();
 };
+
+// 添加切换摄像头的函数
+async function switchCamera() {
+    if (!mediaStream) {
+        console.error('No media stream available');
+        return;
+    }
+
+    try {
+        // 停止当前视频流
+        mediaStream.getVideoTracks().forEach(track => track.stop());
+        
+        // 切换摄像头
+        currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+        
+        // 重新获取媒体流
+        await startMedia();
+        
+        // 更新UI显示当前使用的摄像头
+        const cameraStatus = currentFacingMode === "environment" ? "后置" : "前置";
+        appendMessage('System', `已切换至${cameraStatus}摄像头`);
+        
+    } catch (err) {
+        console.error('切换摄像头失败:', err);
+        appendMessage('System', '切换摄像头失败,请检查设备权限');
+        
+        // 切换失败时恢复之前的设置
+        currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+    }
+}

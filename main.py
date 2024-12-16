@@ -39,8 +39,11 @@ HTML = """
         </div>
         
         <div class="controls">
-            <button id="startButton">开始对话</button>
+            <button id="startButton">开始live对话</button>
             <button id="stopButton">结束对话</button>
+            <button id="switchCameraBtn" onclick="switchCamera()" style="font-size: 24px; background: none; border: none; cursor: pointer;">
+                📷
+            </button>
         </div>
     </div>
     <script src="/static/app.js"></script>
