@@ -109,7 +109,7 @@ button:hover {
         width: 100%;
         height: auto;
         object-fit: contain;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         aspect-ratio: 3/4; /* Changed aspect ratio for mobile */
         max-height: 45vh;
     }
@@ -126,7 +126,7 @@ button:hover {
     .messages {
         font-size: 16px;
         padding: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         max-height: 250px;
         overflow-y: auto;
     }
@@ -138,7 +138,7 @@ button:hover {
     }
     
     .input-container {
-        margin-top: 10px;
+        margin-top: 5px;
         gap: 8px;
     }
     
