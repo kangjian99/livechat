@@ -1,8 +1,4 @@
 # main.py
-from dotenv import load_dotenv
-load_dotenv()
-import uvicorn
-
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -276,6 +272,3 @@ async def handle_google_messages(client_ws: WebSocket, google_ws):
             print(f"Unexpected error: {e}")
             print(f"Error type: {type(e)}")
             print(f"Full message: {message}")
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", reload=True, port=8000)
