@@ -108,9 +108,10 @@ button:hover {
     #localVideo {
         width: 100%;
         height: auto;
-        max-height: 60vh;
-        object-fit: contain;
+        max-height: 50vh;
+        object-fit: cover;
         margin-bottom: 10px;
+        aspect-ratio: 9/16; /* Changed aspect ratio for mobile */
     }
     
     .chat-container {
