@@ -21,6 +21,10 @@ const FRAME_CAPTURE_INTERVAL = 2000; // 捕获1帧间隔时间
 
 let currentFacingMode = "environment"; // 默认使用后置摄像头
 
+function getDeviceType() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mobile" : "desktop";
+}
+
 async function processAudioBuffers() {
     if (isProcessingAudio || audioBuffers.length === 0) {
         return;
@@ -242,7 +246,7 @@ async function startMedia() {
         await audioContext.resume();
 
         startSendingMedia();
-        const deviceType = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "手机端" : "电脑端";
+        const deviceType = getDeviceType() === "mobile" ? "手机端" : "电脑端";
         appendMessage('System', `当前设备类型: ${deviceType}`);
         
     } catch (err) {

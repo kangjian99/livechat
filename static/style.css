@@ -71,7 +71,7 @@ input {
 }
 
 button {
-    padding: 4px 16px !important;
+    padding: 10px 16px !important;
     font-size: small;
     background-color: #2196f3;
     color: white;
@@ -133,7 +133,7 @@ button:hover {
     
     .message {
         padding: 10px;
-        margin: 8px 0;
+        margin: 5px 0;
         font-size: 16px;
     }
     
