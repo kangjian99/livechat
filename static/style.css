@@ -111,7 +111,7 @@ button:hover {
         object-fit: contain;
         margin-bottom: 10px;
         aspect-ratio: 9/16; /* Changed aspect ratio for mobile */
-        max-height: 40vh;
+        max-height: 50vh;
     }
     
     .chat-container {
@@ -149,7 +149,7 @@ button:hover {
     }
     
     button {
-        padding: 4px 16px !important;
+        padding: 4px 12px !important;
         font-size: 14px !important;
     }
     
@@ -165,8 +165,8 @@ button:hover {
     }
     
     #switchCameraBtn {
-        padding: 12px !important;
-        font-size: 28px !important;
+        padding: 8px !important;
+        font-size: 24px !important;
     }
 }
 
