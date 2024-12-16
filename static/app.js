@@ -171,7 +171,7 @@ async function playNextAudio() {
 
 // 初始化 WebSocket 连接
 function connectWebSocket() {
-    ws = new WebSocket(`ws://${window.location.host}/ws`);
+    ws = new WebSocket(`wss://${window.location.host}/ws`);
     
     ws.onopen = () => {
         console.log('WebSocket connected');
