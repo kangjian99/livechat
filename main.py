@@ -42,15 +42,17 @@ HTML = """
         <div class="controls">
             <button id="startButton">开始live对话</button>
             <button id="stopButton">结束对话</button>
-            <script>
-                const deviceType = getDeviceType();
-                if (deviceType !== 'desktop') {
-                    document.write('<button id="switchCameraBtn" onclick="switchCamera()" style="font-size: 24px; background: none; border: none; cursor: pointer;">📷</button>');
-                }
-            </script>
+            <div id="cameraButton"></div>
         </div>
     </div>
     <script src="/static/app.js"></script>
+    <script>
+        const deviceType = getDeviceType();
+        if (deviceType !== 'desktop') {
+            const cameraButton = document.getElementById('cameraButton');
+            cameraButton.innerHTML = '<button id="switchCameraBtn" onclick="switchCamera()" style="font-size: 24px; background: none; border: none; cursor: pointer;">📷</button>';
+        }
+    </script>
 </body>
 </html>
 """
