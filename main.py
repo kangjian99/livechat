@@ -78,7 +78,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 client_task.add_done_callback(check_task)
                 google_task.add_done_callback(check_task)
                 
-        except* Exception as e:
+        except Exception as e:
             print(f"TaskGroup error details:", e)
             for exc in e.exceptions:
                 print(f"Exception type: {type(exc)}")
