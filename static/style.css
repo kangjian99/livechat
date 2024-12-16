@@ -8,17 +8,19 @@
 }
 
 .video-container {
-    max-width: 400px;
     width: 100%;
+    max-width: 400px;
     margin: 0 auto;
+    position: relative;
+    overflow: hidden;
 }
 
 #localVideo {
     width: 100%;
-    height: auto;
-    aspect-ratio: 16/9;
+    height: 100%;
     object-fit: cover;
-    border-radius: 8px;
+    transform-origin: center;
+    transition: transform 0.3s ease;
 }
 
 .chat-container {
@@ -102,6 +104,7 @@ button:hover {
     .video-container {
         width: 100%;
         max-width: none;
+        aspect-ratio: 9/16;
         margin-bottom: 15px;
     }
     
@@ -169,6 +172,12 @@ button:hover {
     #switchCameraBtn {
         padding: 12px !important;
         font-size: 28px !important;
+    }
+    
+    #localVideo.rotate-landscape {
+        transform: rotate(-90deg);
+        width: 100vh;
+        height: 100vw;
     }
 }
 

@@ -204,28 +204,35 @@ function connectWebSocket() {
     };
 }
 
-// 获取用户媒体流
+function getOptimalVideoSettings() {
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const aspectRatio = isMobile ? { width: { ideal: 720 }, height: { ideal: 1280 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
+    return {
+        video: {
+            facingMode: currentFacingMode,
+            ...aspectRatio
+        },
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1,
+            sampleRate: 16000,
+            latency: 0,
+            suppressLocalAudioPlayback: true
+        }
+    };
+}
+
+// 获取用户媒体流（修改为动态分辨率设置）
 async function startMedia() {
     try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: currentFacingMode,
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                channelCount: 1,
-                sampleRate: 16000,
-                latency: 0,
-                echoCancellationType: 'system',
-                suppressLocalAudioPlayback: true
-            }
-        });
+        const mediaSettings = getOptimalVideoSettings();
+        mediaStream = await navigator.mediaDevices.getUserMedia(mediaSettings);
         
-        document.getElementById('localVideo').srcObject = mediaStream;
+        const videoElement = document.getElementById('localVideo');
+        videoElement.srcObject = mediaStream;
+        videoElement.muted = true;  // 静音本地视频
         
         // 创建音频上下文
         audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -233,12 +240,14 @@ async function startMedia() {
             latencyHint: 'interactive'  // 降低延迟
         });
         await audioContext.resume();
-        
+
         startSendingMedia();
+        const deviceType = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "手机端" : "电脑端";
+        appendMessage('System', `当前设备类型: ${deviceType}`);
         
     } catch (err) {
         console.error("Error accessing media devices:", err);
-        appendMessage('System', '设备访问失败,请检查权限设置');
+        appendMessage('System', '设备访问失败，请检查权限设置');
     }
 }
 
