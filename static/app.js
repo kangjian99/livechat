@@ -206,7 +206,16 @@ function connectWebSocket() {
 
 function getOptimalVideoSettings() {
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const aspectRatio = isMobile ? { width: { ideal: 720 }, height: { ideal: 1280 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
+    const screenWidth = window.screen.width;
+    const screenHeight = window.screen.height;
+    let aspectRatio;
+    if (isMobile) {
+        // 竖屏模式下限制视频高度
+        const maxHeight = Math.min(screenHeight * 0.6, 1280); // 限制最大高度为屏幕高度的60%或1280，取较小值
+        aspectRatio = { width: { ideal: Math.min(screenWidth, maxHeight * (screenWidth/screenHeight)) }, height: { ideal: maxHeight } };
+    } else {
+        aspectRatio = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    }
     return {
         video: {
             facingMode: currentFacingMode,
