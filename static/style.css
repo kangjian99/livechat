@@ -108,7 +108,7 @@ button:hover {
     #localVideo {
         width: 100%;
         height: auto;
-        max-height: 40vh;
+        max-height: 50vh;
         object-fit: cover;
         margin-bottom: 10px;
         aspect-ratio: 9/16; /* Changed aspect ratio for mobile */
@@ -162,8 +162,6 @@ button:hover {
     
     #startButton,
     #stopButton {
-        padding: 12px 24px !important;
-        font-size: 16px !important;
         min-width: 100px;
     }
     
