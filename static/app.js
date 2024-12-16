@@ -206,7 +206,7 @@ function connectWebSocket() {
 
 function getOptimalVideoSettings() {
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const aspectRatio = isMobile ? { width: { ideal: 720 }, height: { ideal: 1280 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
+    const aspectRatio = isMobile ? { width: { ideal: 720 }, height: { ideal: 540 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
     return {
         video: {
             facingMode: currentFacingMode,
