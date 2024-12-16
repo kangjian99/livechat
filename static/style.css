@@ -111,7 +111,7 @@ button:hover {
         object-fit: contain;
         margin-bottom: 10px;
         aspect-ratio: 3/4; /* Changed aspect ratio for mobile */
-        max-height: 40vh;
+        max-height: 45vh;
     }
     
     .chat-container {
