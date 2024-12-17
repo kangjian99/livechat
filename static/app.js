@@ -4,13 +4,15 @@ let mediaStream = null;
 let audioContext = null;
 let isConversationStarted = false;
 
+// 采样率常量
+const SEND_SAMPLE_RATE = 16000;  // 发送采样率
+const RECEIVE_SAMPLE_RATE = 24000;  // 接收采样率
+const CHUNK_SIZE = 512;  // 与Python端保持一致
+
 // 全局音频上下文
 let globalAudioContext = null;
 let isPlayingAudio = false;
 const audioQueue = [];
-
-// 移除复杂的缓冲区设置
-const CHUNK_SIZE = 512;  // 与Python端保持一致
 
 const FRAME_CAPTURE_INTERVAL = 2000; // 捕获1帧间隔时间
 const AUTO_CLOSE_MINUTES = 5;  // 自动断连时间
@@ -25,7 +27,7 @@ function getDeviceType() {
 function initAudioContext() {
     if (!globalAudioContext) {
         globalAudioContext = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 24000
+            sampleRate: RECEIVE_SAMPLE_RATE
         });
     }
     return globalAudioContext;
@@ -43,7 +45,7 @@ async function processAudio(audioData) {
     try {
         const context = initAudioContext();
         
-        const audioBuffer = context.createBuffer(1, audioData.length, 24000);
+        const audioBuffer = context.createBuffer(1, audioData.length, RECEIVE_SAMPLE_RATE);
         const channelData = audioBuffer.getChannelData(0);
         
         for (let i = 0; i < audioData.length; i++) {
@@ -96,11 +98,11 @@ async function playNextAudio() {
         
         // 创建AudioContext（如果还没有创建）
         const playbackContext = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 24000  // 接收采样率为24kHz
+            sampleRate: RECEIVE_SAMPLE_RATE
         });
         
         // 创建AudioBuffer
-        const audioBuffer = playbackContext.createBuffer(1, bytes.length / 2, 24000);
+        const audioBuffer = playbackContext.createBuffer(1, bytes.length / 2, RECEIVE_SAMPLE_RATE);
         const channelData = audioBuffer.getChannelData(0);
         
         // 将16位PCM数据转换为Float32
@@ -212,14 +214,14 @@ function getOptimalVideoSettings() {
             noiseSuppression: true,
             autoGainControl: true,
             channelCount: 1,
-            sampleRate: 16000,
+            sampleRate: SEND_SAMPLE_RATE,  // 使用发送采样率常量
             latency: 0,
             suppressLocalAudioPlayback: true
         }
     };
 }
 
-// 获取用户媒体流（修改为动态分辨率设置）
+// 获取用户媒体流
 async function startMedia() {
     try {
         const mediaSettings = getOptimalVideoSettings();
@@ -231,7 +233,7 @@ async function startMedia() {
         
         // 创建音频上下文
         audioContext = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 16000,
+            sampleRate: SEND_SAMPLE_RATE,  // 使用发送采样率常量
             latencyHint: 'interactive'  // 降低延迟
         });
         await audioContext.resume();
