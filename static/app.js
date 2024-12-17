@@ -18,6 +18,7 @@ const MAX_BUFFER_SIZE = 32768;   // 保持最大缓冲区不变
 const OPTIMAL_BUFFER_SIZE = 24576;  // 保持理想大小不变
 
 const FRAME_CAPTURE_INTERVAL = 2000; // 捕获1帧间隔时间
+const AUTO_CLOSE_MINUTES = 5;  // 自动断连时间
 
 let currentFacingMode = "environment"; // 默认使用后置摄像头
 
@@ -180,19 +181,43 @@ function connectWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     
+    let timeoutId = null;
+    
     ws.onopen = () => {
         console.log('WebSocket connected');
         appendMessage('System', '连接成功');
+        
+        // 设置x分钟后自动断开连接
+        timeoutId = setTimeout(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // 发送提示消息
+                appendMessage('System', '连接即将在1分钟后自动断开，请确认继续使用。');
+                // 再设置1分钟后断开连接
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                        console.log(`WebSocket closed after ${AUTO_CLOSE_MINUTES} minutes`);
+                        appendMessage('System', `连接超过${AUTO_CLOSE_MINUTES}分钟，已自动断开`);
+                    }
+                }, 60000);
+            }
+        }, (AUTO_CLOSE_MINUTES - 1) * 60000); // 在超时前1分钟发送提示消息
     };
     
     ws.onclose = () => {
         console.log('WebSocket disconnected');
         appendMessage('System', '连接已断开');
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
     };
     
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         appendMessage('System', '连接错误');
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
     };
     
     ws.onmessage = function(event) {
