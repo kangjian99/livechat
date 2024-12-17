@@ -4,18 +4,13 @@ let mediaStream = null;
 let audioContext = null;
 let isConversationStarted = false;
 
-// 添加音频队列管理
-const audioQueue = [];
+// 全局音频上下文
+let globalAudioContext = null;
 let isPlayingAudio = false;
+const audioQueue = [];
 
-// 添加音频缓冲区管理
-const BUFFER_SIZE = 2048;  // 更大的缓冲区
-const audioBuffers = [];
-let isProcessingAudio = false;
-
-const MIN_BUFFER_SIZE = 4800;    // 降低最小缓冲区大小
-const MAX_BUFFER_SIZE = 32768;   // 保持最大缓冲区不变
-const OPTIMAL_BUFFER_SIZE = 24576;  // 保持理想大小不变
+// 移除复杂的缓冲区设置
+const CHUNK_SIZE = 512;  // 与Python端保持一致
 
 const FRAME_CAPTURE_INTERVAL = 2000; // 捕获1帧间隔时间
 const AUTO_CLOSE_MINUTES = 5;  // 自动断连时间
@@ -26,88 +21,59 @@ function getDeviceType() {
     return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mobile" : "desktop";
 }
 
-async function processAudioBuffers() {
-    if (isProcessingAudio || audioBuffers.length === 0) {
+// 初始化全局音频上下文
+function initAudioContext() {
+    if (!globalAudioContext) {
+        globalAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 24000
+        });
+    }
+    return globalAudioContext;
+}
+
+// 音频处理函数
+async function processAudio(audioData) {
+    if (isPlayingAudio) {
+        audioQueue.push(audioData);
         return;
     }
     
-    isProcessingAudio = true;
+    isPlayingAudio = true;
     
     try {
-        // 计算当前可用的总数据量
-        const totalAvailable = audioBuffers.reduce((acc, buf) => acc + buf.length, 0);
+        const context = initAudioContext();
         
-        // 确定这次处理的目标大小
-        let targetSize;
-        if (totalAvailable < MIN_BUFFER_SIZE) {
-            // 即使数据较少也进行处理
-            targetSize = totalAvailable;
-        } else if (totalAvailable <= OPTIMAL_BUFFER_SIZE) {
-            // 使用所有可用数据
-            targetSize = totalAvailable;
-        } else {
-            // 使用理想大小或最大大小
-            targetSize = Math.min(OPTIMAL_BUFFER_SIZE, MAX_BUFFER_SIZE);
-        }
-        
-        const combinedBuffer = new Int16Array(targetSize);
-        let offset = 0;
-        
-        // 填充缓冲区
-        while (audioBuffers.length > 0 && offset < targetSize) {
-            const buffer = audioBuffers[0];
-            const remainingSpace = targetSize - offset;
-            
-            if (buffer.length <= remainingSpace) {
-                combinedBuffer.set(buffer, offset);
-                offset += buffer.length;
-                audioBuffers.shift();
-            } else {
-                combinedBuffer.set(buffer.slice(0, remainingSpace), offset);
-                audioBuffers[0] = buffer.slice(remainingSpace);
-                offset += remainingSpace;
-            }
-        }
-        
-        // 创建新的AudioContext用于播放
-        const playbackContext = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 24000
-        });
-        
-        // 创建AudioBuffer
-        const audioBuffer = playbackContext.createBuffer(1, offset, 24000);
+        const audioBuffer = context.createBuffer(1, audioData.length, 24000);
         const channelData = audioBuffer.getChannelData(0);
         
-        // 直接转换数据
-        for (let i = 0; i < offset; i++) {
-            channelData[i] = combinedBuffer[i] / 32768.0;
+        for (let i = 0; i < audioData.length; i++) {
+            channelData[i] = audioData[i] / 32768.0;
         }
         
-        const source = playbackContext.createBufferSource();
+        const source = context.createBufferSource();
         source.buffer = audioBuffer;
         
-        const gainNode = playbackContext.createGain();
-        gainNode.gain.value = 0.8;
+        // 添加音量控制
+        const gainNode = context.createGain();
+        gainNode.gain.value = 1.0; // 可以调整音量
         
         source.connect(gainNode);
-        gainNode.connect(playbackContext.destination);
+        gainNode.connect(context.destination);
         
         source.onended = () => {
-            playbackContext.close();
-            isProcessingAudio = false;
-            if (audioBuffers.length > 0) {
-                processAudioBuffers();
+            isPlayingAudio = false;
+            if (audioQueue.length > 0) {
+                processAudio(audioQueue.shift());
             }
         };
         
-        console.log('Playing audio buffer, length:', offset);
         source.start(0);
         
     } catch (err) {
-        console.error('Error processing audio:', err);
-        isProcessingAudio = false;
-        if (audioBuffers.length > 0) {
-            processAudioBuffers();
+        console.error('Error playing audio:', err);
+        isPlayingAudio = false;
+        if (audioQueue.length > 0) {
+            processAudio(audioQueue.shift());
         }
     }
 }
@@ -402,12 +368,8 @@ function playAudio(base64Data) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         
-        // 将数据添加到缓冲区
         const int16Data = new Int16Array(bytes.buffer);
-        audioBuffers.push(int16Data);
-        
-        // 触发处理
-        processAudioBuffers();
+        processAudio(int16Data);
         
     } catch (err) {
         console.error('Error queuing audio:', err);
@@ -485,4 +447,14 @@ async function switchCamera() {
         // 切换失败时恢复之前的设置
         currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
     }
+}
+
+// 清理函数 - 在需要时调用
+function cleanupAudio() {
+    if (globalAudioContext) {
+        globalAudioContext.close();
+        globalAudioContext = null;
+    }
+    audioQueue.length = 0;
+    isPlayingAudio = false;
 }
