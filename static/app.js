@@ -7,7 +7,7 @@ let isConversationStarted = false;
 // 采样率常量
 const SEND_SAMPLE_RATE = 16000;  // 发送采样率
 const RECEIVE_SAMPLE_RATE = 24000;  // 接收采样率
-const CHUNK_SIZE = 512;  // 与Python端保持一致
+const CHUNK_SIZE = 1024;  // 与后端保持一致
 
 // 全局音频上下文
 let globalAudioContext = null;

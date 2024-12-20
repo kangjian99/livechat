@@ -5,15 +5,15 @@ from fastapi.staticfiles import StaticFiles
 import asyncio
 import json
 import base64
-import os
-from websockets.client import connect
 from PIL import Image
 import io
 import time
+from google import genai
+
+MODEL = "models/gemini-2.0-flash-exp"
+CONFIG = {"generation_config": {"response_modalities": ["AUDIO"]}}
 
 app = FastAPI()
-
-# 挂载静态文件目录
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # HTML 模板
@@ -63,97 +63,68 @@ async def get():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    print("New WebSocket connection request")  # 调试日志
+    print("New WebSocket connection request")
     await websocket.accept()
-    print("WebSocket connection accepted")  # 调试日志
     
     try:
-        google_ws = await connect_google_ai()
-        print("Google AI connection established")  # 调试日志
+        # 初始化 genai client
+        client = genai.Client(http_options={"api_version": "v1alpha"})
         
-        try:
+        async with client.aio.live.connect(model=MODEL, config=CONFIG) as session:
+            print("Google AI session established")
+            
+            # 创建队列用于音视频数据传输
+            audio_in_queue = asyncio.Queue()
+            media_out_queue = asyncio.Queue(maxsize=5)
+            
             async with asyncio.TaskGroup() as tg:
-                client_task = tg.create_task(handle_client_messages(websocket, google_ws))
-                google_task = tg.create_task(handle_google_messages(websocket, google_ws))
+                # 处理来自客户端的消息
+                client_task = tg.create_task(
+                    handle_client_messages(websocket, session, media_out_queue)
+                )
+                
+                # 发送媒体数据到 Google AI
+                media_task = tg.create_task(
+                    send_media_to_ai(session, media_out_queue)
+                )
+                
+                # 处理 AI 响应
+                ai_task = tg.create_task(
+                    handle_ai_responses(websocket, session, audio_in_queue)
+                )
+                
+                # 播放音频
+                audio_task = tg.create_task(
+                    play_audio(websocket, audio_in_queue)
+                )
                 
                 def check_task(task):
                     if task.cancelled():
                         print(f"Task was cancelled: {task}")
-                        return
                     if task.exception():
                         print(f"Task failed: {task.exception()}")
-                        print(f"Exception type: {type(task.exception())}")
-                        
-                client_task.add_done_callback(check_task)
-                google_task.add_done_callback(check_task)
                 
-        except* Exception as e:
-            print(f"TaskGroup error details:", e)
-            for exc in e.exceptions:
-                print(f"Exception type: {type(exc)}")
-                print(f"Exception: {exc}")
+                for task in [client_task, media_task, ai_task, audio_task]:
+                    task.add_done_callback(check_task)
+                    
     except Exception as e:
-        print(f"Connection error: {e}")
+        print(f"Session error: {e}")
     finally:
-        if 'google_ws' in locals():
-            await google_ws.close()
-            print("Google AI connection closed")  # 调试日志
+        print("Session closed")
 
-async def connect_google_ai():
-    """连接到 Google AI 服务"""
-    try:
-        host = 'generativelanguage.googleapis.com'
-        model = "gemini-2.0-flash-exp"
-        api_key = os.environ['GOOGLE_API_KEY']
-        uri = f"wss://{host}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={api_key}"
-        
-        print(f"Connecting to {host}...")  # 调试日志
-        
-        ws = await connect(uri)
-        print("WebSocket connected")  # 调试日志
-        
-        # 发送setup消息
-        setup_msg = {
-            "setup": {
-                "model": f"models/{model}"
-            }
-        }
-        print(f"Sending setup message: {setup_msg}")  # 调试日志
-        await ws.send(json.dumps(setup_msg))
-        
-        # 等待setup响应
-        setup_response = await ws.recv()
-        print(f"Setup response received: {setup_response}")  # 调试日志
-        
-        return ws
-        
-    except Exception as e:
-        print(f"Error connecting to Google AI: {e}")
-        print(f"Error type: {type(e)}")
-        raise
-
-async def handle_client_messages(websocket: WebSocket, google_ws):
+async def handle_client_messages(websocket, session, media_queue):
     last_frame_time = 0
     
     while True:
         try:
             raw_message = await websocket.receive()
-            #print(f"Received raw message type: {raw_message.get('type', 'unknown')}")  # 调试日志
             
             if "text" in raw_message:
                 data = json.loads(raw_message["text"])
-                #print(f"Parsed client data: {data}")  # 调试日志
                 
                 # 处理文本消息
                 if "content" in data and not "mime_type" in data:
-                    msg = {
-                        "client_content": {
-                            "turn_complete": True,
-                            "turns": [{"role": "user", "parts": [{"text": data["content"]}]}],
-                        }
-                    }
-                    print(f"Sending text message to Google AI: {msg}")  # 调试日志
-                    await google_ws.send(json.dumps(msg))
+                    await session.send(data["content"], end_of_turn=True)
                 
                 # 处理媒体数据
                 elif "mime_type" in data and "content" in data:
@@ -165,26 +136,16 @@ async def handle_client_messages(websocket: WebSocket, google_ws):
                             try:
                                 img_data = base64.b64decode(data["content"])
                                 img = Image.open(io.BytesIO(img_data))
-                                
-                                max_size = (1024, 1024)
-                                img.thumbnail(max_size)
+                                img.thumbnail((1024, 1024))
                                 
                                 buffer = io.BytesIO()
                                 img.save(buffer, format="jpeg")
-                                compressed_data = base64.b64encode(buffer.getvalue()).decode()
                                 
-                                msg = {
-                                    "realtime_input": {
-                                        "media_chunks": [
-                                            {
-                                                "data": compressed_data,
-                                                "mime_type": "image/jpeg"
-                                            }
-                                        ]
-                                    }
-                                }
-                                #print("Sending video frame to Google AI")  # 调试日志
-                                await google_ws.send(json.dumps(msg))
+                                await media_queue.put({
+                                    "mime_type": "image/jpeg",
+                                    "data": base64.b64encode(buffer.getvalue()).decode()
+                                })
+                                
                                 last_frame_time = current_time
                                 
                             except Exception as e:
@@ -192,92 +153,44 @@ async def handle_client_messages(websocket: WebSocket, google_ws):
                     
                     # 处理音频数据
                     elif data["mime_type"] == "audio/pcm":
-                        # 验证音频数据格式
                         try:
                             audio_data = base64.b64decode(data["content"])
-                            #print(f"Received audio chunk size: {len(audio_data)} bytes")  # 调试日志
-                            
-                            # 确保音频数据大小符合预期
-                            expected_size = 512 * 2  # 512 samples * 2 bytes per sample (16-bit)
-                            if len(audio_data) != expected_size:
-                                print(f"Warning: Unexpected audio chunk size. Expected {expected_size}, got {len(audio_data)}")
-                            
-                            msg = {
-                                "realtime_input": {
-                                    "media_chunks": [
-                                        {
-                                            "data": data["content"],
-                                            "mime_type": "audio/pcm"
-                                        }
-                                    ]
-                                }
-                            }
-                            #print("Sending audio chunk to Google AI")  # 调试日志
-                            await google_ws.send(json.dumps(msg))
-                            
+                            await media_queue.put({
+                                "mime_type": "audio/pcm",
+                                "data": audio_data
+                            })
                         except Exception as e:
                             print(f"Error processing audio: {e}")
                     
-        except json.JSONDecodeError as e:
-            print(f"Error decoding client message: {e}")
-        except KeyError as e:
-            print(f"KeyError in client message: {e}")
-            print(f"Message structure: {raw_message}")
         except Exception as e:
-            print(f"Unexpected error in client message handling: {e}")
-            print(f"Error type: {type(e)}")
+            print(f"Error handling client message: {e}")
             raise
 
-async def handle_google_messages(client_ws: WebSocket, google_ws):
-    print("Starting to handle Google messages")  # 调试日志
-    async for message in google_ws:
-        #print(f"Received message from Google AI: {message}")  # 调试日志
+async def send_media_to_ai(session, media_queue):
+    while True:
+        msg = await media_queue.get()
+        await session.send(msg)
+
+async def handle_ai_responses(websocket, session, audio_queue):
+    while True:
+        turn = session.receive()
+        async for response in turn:
+            if data := response.data:
+                await audio_queue.put(data)
+            if text := response.text:
+                await websocket.send_json({
+                    "type": "text",
+                    "content": text
+                })
         
-        try:
-            # 确保正确解码消息
-            if isinstance(message, bytes):
-                decoded_message = message.decode("ascii")
-            else:
-                decoded_message = message
-                
-            response = json.loads(decoded_message)
-            #print(f"Parsed response: {response}")  # 调试日志
-            
-            # 处理文本响应
-            if "serverContent" in response:
-                if "modelTurn" in response["serverContent"]:
-                    if "parts" in response["serverContent"]["modelTurn"]:
-                        for part in response["serverContent"]["modelTurn"]["parts"]:
-                            try:
-                                if "text" in part:
-                                    print(f"Sending text to client: {part['text']}")  # 调试日志
-                                    await client_ws.send_json({
-                                        "type": "text",
-                                        "content": part["text"]
-                                    })
-                                elif "inlineData" in part and "data" in part["inlineData"]:
-                                    #print("Sending audio data to client")  # 调试日志
-                                    await client_ws.send_json({
-                                        "type": "audio",
-                                        "content": part["inlineData"]["data"]
-                                    })
-                            except Exception as e:
-                                print(f"Error processing part: {e}")
-                                print(f"Part content: {part}")
-                
-                if "turnComplete" in response["serverContent"]:
-                    print("Turn complete")
-                    
-            elif "setupComplete" in response:
-                print("Setup completed successfully")
-                
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
-            print(f"Raw message: {message}")
-        except KeyError as e:
-            print(f"KeyError while parsing response: {e}")
-            print(f"Response structure: {response}")
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            print(f"Error type: {type(e)}")
-            print(f"Full message: {message}")
+        # 清空音频队列以支持打断
+        while not audio_queue.empty():
+            audio_queue.get_nowait()
+
+async def play_audio(websocket, audio_queue):
+    while True:
+        data = await audio_queue.get()
+        await websocket.send_json({
+            "type": "audio",
+            "content": base64.b64encode(data).decode()
+        })
